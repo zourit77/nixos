@@ -128,13 +128,12 @@
   users.users.tux = {
     isNormalUser = true;
     description = "tux";
-    extraGroups = [ "networkmanager" "wheel" ];
+    extraGroups = [ "networkmanager" "wheel" "libvirtd"];
     packages = with pkgs; [
       plymouth
       adi1090x-plymouth-themes
       plymouth-proxzima-theme
       plymouth-matrix-theme
-
       mesa-demos
       brave
       parabolic
@@ -181,6 +180,8 @@
       wakeonlan
       github-desktop
       libnotify
+      ocs-url
+      telegram-desktop
       gnome-tweaks
       whitesur-gtk-theme
       whitesur-cursors
@@ -234,7 +235,13 @@
   environment.systemPackages = with pkgs; [
     vim
     pciutils
+    qemu
+    virt-manager
+    virt-viewer
   ];
+  
+  virtualisation.libvirtd.enable = true;
+  programs.virt-manager.enable = true;
 
   system.stateVersion = "26.05";
 }
