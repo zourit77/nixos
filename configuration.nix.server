@@ -1,0 +1,135 @@
+# Edit this configuration file to define what should be installed on
+# your system.  Help is available in the configuration.nix(5) man page
+# and in the NixOS manual (accessible by running ‘nixos-help’).
+
+{ config, pkgs, lib,... }:
+
+{
+  imports =
+    [ # Include the results of the hardware scan.
+      ./hardware-configuration.nix
+    ];
+
+  # Bootloader.
+  boot.loader.grub.enable = true;
+  boot.loader.grub.device = "/dev/vda";
+  boot.loader.grub.useOSProber = true;
+  # Use provided UUIDs instead of blkid probing (required for btrfs subvolumes)
+  boot.loader.grub.fsIdentifier = "provided";
+
+  networking.hostName = "SRV-NIX-TEST"; # Define your hostname.
+  # networking.wireless.enable = true;  # Enables wireless support via wpa_supplicant.
+
+  # Configure network proxy if necessary
+  # networking.proxy.default = "http://user:password@proxy:port/";
+  # networking.proxy.noProxy = "127.0.0.1,localhost,internal.domain";
+
+  # Enable networking
+  networking.networkmanager.enable = true;
+  networking.firewall.enable = false;
+  #networking.firewall.allowedTCPPort = [ 22 9090 ];  
+
+  #cockpit
+
+   services.udisks2.enable = true;   
+
+   services.cockpit = {
+     enable = true;
+     port = 9090;
+     openFirewall = false;
+      };
+  
+  environment.etc."cockpit/cockpit.conf".text = lib.mkForce ''
+  [WebService]
+    Origins = https://domain.tld
+    ProtocolHeader = X-Forwarded-Proto
+    AllowUnencrypted = true
+	'';
+
+  #docker
+  virtualisation.docker.enable = true;
+  #virtualisation.docker.extraOptions = "--log-opt max-size=10m --log-opt max-file=3";
+
+  # Set your time zone
+  time.timeZone = "Europe/Paris";
+
+  # Select internationalisation properties.
+  i18n.defaultLocale = "fr_FR.UTF-8";
+
+  i18n.extraLocaleSettings = {
+    LC_ADDRESS = "fr_FR.UTF-8";
+    LC_IDENTIFICATION = "fr_FR.UTF-8";
+    LC_MEASUREMENT = "fr_FR.UTF-8";
+    LC_MONETARY = "fr_FR.UTF-8";
+    LC_NAME = "fr_FR.UTF-8";
+    LC_NUMERIC = "fr_FR.UTF-8";
+    LC_PAPER = "fr_FR.UTF-8";
+    LC_TELEPHONE = "fr_FR.UTF-8";
+    LC_TIME = "fr_FR.UTF-8";
+  };
+
+  # Configure keymap in X11
+  services.xserver.xkb = {
+    layout = "fr";
+    variant = "";
+  };
+
+  # Configure console keymap
+  console.keyMap = "fr";
+
+  # Define a user account. Don't forget to set a password with ‘passwd’.
+  users.users."tux" = {
+    isNormalUser = true;
+    description = "tux";
+    extraGroups = [ "networkmanager" "wheel" "docker" ];
+    packages = with pkgs; [
+	docker
+	docker-compose
+	#cockpit
+	htop
+	cloudflared
+	];
+  };
+
+  # Allow unfree packages
+  nixpkgs.config.allowUnfree = true;
+
+  # List packages installed in system profile. To search, run:
+  # $ nix search wget
+  environment.systemPackages = with pkgs; [
+  #  vim # Do not forget to add an editor to edit configuration.nix! The Nano editor is also installed by default.
+  #  wget
+	udisks2
+  ];
+
+  # Some programs need SUID wrappers, can be configured further or are
+  # started in user sessions.
+  # programs.mtr.enable = true;
+  # programs.gnupg.agent = {
+  #   enable = true;
+  #   enableSSHSupport = true;
+  # };
+
+  # List services that you want to enable:
+
+  # Enable the OpenSSH daemon.
+  services.openssh.enable = true;
+  #services.openssh.passwordAuthentification = true;
+  #services.openssh.port = 22;
+
+
+  # Open ports in the firewall.
+  #networking.firewall.allowedTCPPorts = [ "22" "9090" ];
+  # networking.firewall.allowedUDPPorts = [ ... ];
+  # Or disable the firewall altogether.
+  # networking.firewall.enable = false;
+
+  # This value determines the NixOS release from which the default
+  # settings for stateful data, like file locations and database versions
+  # on your system were taken. It‘s perfectly fine and recommended to leave
+  # this value at the release version of the first install of this system.
+  # Before changing this value read the documentation for this option
+  # (e.g. man configuration.nix or on https://nixos.org/nixos/options.html).
+  system.stateVersion = "26.05"; # Did you read the comment?
+
+}
