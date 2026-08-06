@@ -1,43 +1,77 @@
-{ config, pkgs, ... }:
+{ config, pkgs, lib, ... }:
 
 {
+  ##########################################################################
+  # Imports et état du système
+  ##########################################################################
+
   imports = [
     ./hardware-configuration.nix
   ];
+
+  system.stateVersion = "26.05";
+
+  ##########################################################################
+  # Nix et paquets
+  ##########################################################################
+
+  nix.settings.experimental-features = [
+    "nix-command"
+    "flakes"
+  ];
+
+  nixpkgs.config.allowUnfree = true;
+
+  environment.systemPackages = with pkgs; [
+    # Administration système
+    vim
+    htop
+    btop
+    curl
+    wget
+    git
+    pciutils
+    dmidecode
+
+    # Virtualisation et stockage
+    qemu
+    virt-manager
+    virt-viewer
+    udisks2
+    gparted
+
+    # Autres outils
+    flatpak
+  ];
+
+  services.flatpak.enable = true;
+
+  ##########################################################################
+  # Démarrage, noyau et Plymouth
+  ##########################################################################
 
   boot.loader.systemd-boot.enable = true;
   boot.loader.efi.canTouchEfiVariables = true;
   boot.loader.timeout = 1;
 
-  programs.gamemode.enable = true;
-  services.gnome.gnome-remote-desktop.enable = false;
-
-  boot.kernelParams = [ "quiet" "splash" ];
-
-  nix.settings.experimental-features = [ "nix-command" "flakes" ];
-  nixpkgs.config.allowUnfree = true;
-
-  boot.plymouth.enable = true;
-  boot.plymouth.theme = "spinner";
-
-  services.flatpak.enable = true;
-
-  #ajout montage ssd permanent
-  users.groups.games = {};
-
-  fileSystems."/mnt/games" = {
-    device = "/dev/disk/by-uuid/TON-UUID";
-    fsType = "ext4";
-    options = [ "defaults" "nofail" ];
-  };
-
-  systemd.tmpfiles.rules = [
-    "d /mnt/games 0775 root games - -"
+  boot.kernelPackages = pkgs.linuxPackages_zen;
+  boot.kernelParams = [
+    "quiet"
+    "splash"
   ];
 
-  users.users.tonutilisateur = {
-    extraGroups = [ "games" ];
+  boot.plymouth = {
+    enable = true;
+    theme = "script";
   };
+
+  boot.kernel.sysctl = {
+    "vm.max_map_count" = 1048576;
+  };
+
+  ##########################################################################
+  # Pilote graphique NVIDIA et accélération matérielle
+  ##########################################################################
 
   hardware.graphics = {
     enable = true;
@@ -45,7 +79,6 @@
   };
 
   services.xserver.videoDrivers = [ "nvidia" ];
-  boot.kernelPackages = pkgs.linuxPackages_zen;
 
   hardware.nvidia = {
     modesetting.enable = true;
@@ -53,15 +86,87 @@
     nvidiaSettings = true;
     package = config.boot.kernelPackages.nvidiaPackages.stable;
 
-    powerManagement.enable = true;
-    powerManagement.finegrained = true;
+    # powerManagement.enable = true;
+    # powerManagement.finegrained = true;
   };
 
-  services.gvfs.enable = true;
+  ##########################################################################
+  # Environnement graphique GNOME
+  ##########################################################################
+
+  services.xserver.enable = true;
+  services.displayManager.gdm.enable = true;
+  services.desktopManager.gnome.enable = true;
+
+  services.gnome.gnome-remote-desktop.enable = false;
+  services.gnome.gnome-keyring.enable = true;
+
+  environment.gnome.excludePackages = with pkgs; [
+    epiphany
+    yelp
+    gnome-tour
+    gnome-software
+  ];
+
+  ##########################################################################
+  # Clavier, langue et fuseau horaire
+  ##########################################################################
+
+  time.timeZone = "Europe/Paris";
+
+  i18n.defaultLocale = "fr_FR.UTF-8";
+
+  i18n.extraLocaleSettings = {
+    LC_ADDRESS = "fr_FR.UTF-8";
+    LC_IDENTIFICATION = "fr_FR.UTF-8";
+    LC_MEASUREMENT = "fr_FR.UTF-8";
+    LC_MONETARY = "fr_FR.UTF-8";
+    LC_NAME = "fr_FR.UTF-8";
+    LC_NUMERIC = "fr_FR.UTF-8";
+    LC_PAPER = "fr_FR.UTF-8";
+    LC_TELEPHONE = "fr_FR.UTF-8";
+    LC_TIME = "fr_FR.UTF-8";
+  };
+
+  services.xserver.xkb = {
+    layout = "fr";
+    variant = "";
+  };
+
+  console.keyMap = "fr";
+
+  ##########################################################################
+  # Audio, impression et applications de bureau
+  ##########################################################################
+
+  services.printing.enable = true;
+
+  services.pulseaudio.enable = false;
+
+  security.rtkit.enable = true;
+
+  services.pipewire = {
+    enable = true;
+    alsa.enable = true;
+    alsa.support32Bit = true;
+    pulse.enable = true;
+  };
+
+  ##########################################################################
+  # Réseau, pare-feu, SSH et découverte réseau
+  ##########################################################################
+
   networking.hostName = "proprod";
   networking.networkmanager.enable = true;
-  networking.firewall.allowedUDPPorts = [ 5353 ];
-  networking.firewall.allowedTCPPorts = [ 22 ];
+
+  networking.firewall.allowedUDPPorts = [
+    5353
+  ];
+
+  networking.firewall.allowedTCPPorts = [
+    22
+    9090
+  ];
 
   services.openssh = {
     enable = true;
@@ -77,113 +182,95 @@
     nssmdns4 = true;
     nssmdns6 = true;
     openFirewall = true;
+
     publish = {
       enable = true;
       userServices = true;
     };
   };
 
-  time.timeZone = "Europe/Paris";
-
-  i18n.defaultLocale = "fr_FR.UTF-8";
-  i18n.extraLocaleSettings = {
-    LC_ADDRESS = "fr_FR.UTF-8";
-    LC_IDENTIFICATION = "fr_FR.UTF-8";
-    LC_MEASUREMENT = "fr_FR.UTF-8";
-    LC_MONETARY = "fr_FR.UTF-8";
-    LC_NAME = "fr_FR.UTF-8";
-    LC_NUMERIC = "fr_FR.UTF-8";
-    LC_PAPER = "fr_FR.UTF-8";
-    LC_TELEPHONE = "fr_FR.UTF-8";
-    LC_TIME = "fr_FR.UTF-8";
-  };
-
-  services.xserver.enable = true;
-  services.displayManager.gdm.enable = true;
-  services.desktopManager.gnome.enable = true;
-
-  services.xserver.xkb = {
-    layout = "fr";
-    variant = "";
-  };
-
-  console.keyMap = "fr";
-
-  services.printing.enable = true;
-
-  services.pulseaudio.enable = false;
-  security.rtkit.enable = true;
-  services.pipewire = {
-    enable = true;
-    alsa.enable = true;
-    alsa.support32Bit = true;
-    pulse.enable = true;
-  };
-
-  boot.kernel.sysctl = {
-    "vm.max_map_count" = 1048576;
-  };
+  ##########################################################################
+  # Utilisateur principal et groupes
+  ##########################################################################
 
   users.users.tux = {
     isNormalUser = true;
     description = "tux";
-    extraGroups = [ "networkmanager" "wheel" "libvirtd" "docker" ];
+
+    extraGroups = [
+      "networkmanager"
+      "wheel"
+      "libvirtd"
+      "docker"
+      "games"
+    ];
+
     packages = with pkgs; [
-      plymouth
-      adi1090x-plymouth-themes
-      plymouth-proxzima-theme
-      plymouth-matrix-theme
-      mesa-demos
-      brave
-      parabolic
-      photoflare
+      # Jeux et outils associés
       steam
       heroic
-      libreoffice-fresh
+      gamemode
+      protonup-qt
+
+      # Navigateurs et communication
+      brave
       thunderbird
+      discord
+      telegram-desktop
+      zoom-us
+      anydesk
+
+      # Audio, vidéo et multimédia
+      parabolic
       shortwave
-      wireguard-tools
-      jellyfin
       vlc
       ffmpeg
       audacity
       ardour
       mixxx
-      htop
-      btop
-      curl
-      wget
-      gamemode
-      git
-      anydesk
-      gparted
-      nextcloud-client
-      flatpak
-      docker
-      docker-compose
+      jellyfin
+      jellyfin-desktop
+
+      # Bureautique, édition et développement
+      libreoffice-fresh
+      photoflare
       vscodium
-      rpi-imager
+      github-desktop
       joplin-desktop
-      transmission_4
-      discord
+
+      # Réseau, synchronisation et partage de fichiers
+      wireguard-tools
       proton-vpn
-      protonup-qt
+      nextcloud-client
       syncthing
-      zoom-us
-      bazaar
-      gnome.gvfs
+      transmission_4
       samba
       smbclient-ng
-      avahi
       wakeonlan
-      github-desktop
+      avahi
+      gnome.gvfs
+      flatpak
+
+      # Outils système
+      plymouth
+      mesa-demos
+      rpi-imager
       libnotify
-      ocs-url
-      telegram-desktop
-      gnome-tweaks
+
+      # Thèmes et personnalisation GNOME
+      roboto-slab
       whitesur-gtk-theme
       whitesur-cursors
       whitesur-icon-theme
+      nixos-artwork.wallpapers.moonscape
+      nixos-artwork.wallpapers.gear
+      adi1090x-plymouth-themes
+      plymouth-proxzima-theme
+      plymouth-matrix-theme
+      nixos-bgrt-plymouth
+      gnome-tweaks
+
+      # Extensions GNOME
       gnomeExtensions.dash-to-dock
       gnomeExtensions.blur-my-shell
       gnomeExtensions.coverflow-alt-tab
@@ -196,50 +283,93 @@
       gnomeExtensions.wallpaper-slideshow
       gnomeExtensions.ip-finder
       gnomeExtensions.gamemode-shell-extension
+      gnomeExtensions.daily-bing-wallpaper
       gnomeExtensions.user-themes
     ];
   };
 
+  programs.gamemode.enable = true;
+  programs.virt-manager.enable = true;
   programs.firefox.enable = false;
 
-  environment.gnome.excludePackages = with pkgs; [
-    epiphany
-    yelp
-    gnome-tour
-    gnome-software
-  ];
+  ##########################################################################
+  # Virtualisation, stockage amovible et autorisations
+  ##########################################################################
+
+  virtualisation.libvirtd.enable = true;
+  services.udisks2.enable = true;
+
+  security.polkit.extraConfig = ''
+    polkit.addRule(function(action, subject) {
+      if (subject.isInGroup("wheel") &&
+          (action.id == "org.freedesktop.udisks2.filesystem-mount-system" ||
+           action.id == "org.freedesktop.udisks2.filesystem-mount" ||
+           action.id == "org.freedesktop.udisks2.encrypted-unlock-system" ||
+           action.id == "org.freedesktop.udisks2.encrypted-unlock")) {
+        return polkit.Result.YES;
+      }
+    });
+  '';
+
+  # Exemple de montage automatique d'un volume de 2 To
+  # fileSystems."/mnt/games" = {
+  #   device = "/dev/disk/by-uuid/a0d3e781-12be-41ae-8869-9518bcf53820";
+  #   fsType = "ext4";
+  #   options = [ "defaults" "nofail" ];
+  # };
+
+  ##########################################################################
+  # Mises à jour automatiques
+  ##########################################################################
 
   system.autoUpgrade = {
     enable = true;
-    dates = "weekly";
-    allowReboot = false;
+    channel = "https://channels.nixos.org/nixos-26.05";
+    dates = "*-*-* 18:00:00";
     randomizedDelaySec = "45min";
-    flags = [ "--print-build-logs" ];
+    persistent = true;
+    operation = "boot";
+    allowReboot = false;
+
+    # Ne pas utiliser --print-build-logs :
+    # cette option provoquait une erreur avec nix-build.
+    flags = [ ];
   };
 
-  nix.gc = {
-    automatic = true;
-    dates = "weekly";
-    options = "--delete-older-than 7d";
+  ##########################################################################
+  # Nettoyage des anciennes générations
+  ##########################################################################
+
+  systemd.services.nixos-generations-cleanup = {
+    description = "Nettoyage des anciennes générations NixOS";
+    path = [ pkgs.nix ];
+
+    serviceConfig = {
+      Type = "oneshot";
+    };
+
+    script = ''
+      set -euo pipefail
+
+      echo "Conservation des 5 dernières générations système..."
+      nix-env \
+        --profile /nix/var/nix/profiles/system \
+        --delete-generations +5
+
+      echo "Nettoyage des données Nix âgées de plus de 7 jours..."
+      nix-collect-garbage --delete-older-than 7d
+    '';
   };
 
-  nix.settings.auto-optimise-store = true;
+  systemd.timers.nixos-generations-cleanup = {
+    description = "Nettoyage quotidien des générations NixOS";
+    wantedBy = [ "timers.target" ];
 
-  nix.optimise = {
-    automatic = true;
-    dates = [ "weekly" ];
+    timerConfig = {
+      OnCalendar = "*-*-* 19:00:00";
+      RandomizedDelaySec = "30min";
+      Persistent = true;
+      Unit = "nixos-generations-cleanup.service";
+    };
   };
-
-  environment.systemPackages = with pkgs; [
-    vim
-    pciutils
-    qemu
-    virt-manager
-    virt-viewer
-  ];
-
-  virtualisation.libvirtd.enable = true;
-  programs.virt-manager.enable = true;
-
-  system.stateVersion = "26.05";
 }
