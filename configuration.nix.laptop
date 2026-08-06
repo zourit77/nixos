@@ -8,6 +8,8 @@
   boot.loader.systemd-boot.enable = true;
   boot.loader.efi.canTouchEfiVariables = true;
   boot.loader.timeout = 1;
+  # Limite le nombre de générations affichées dans systemd-boot.
+  boot.loader.systemd-boot.configurationLimit = 5;
 
   programs.gamemode.enable = true;
   services.gnome.gnome-remote-desktop.enable = false;
@@ -27,13 +29,12 @@
     enable32Bit = true;
   };
 
-  # Pour PRIME offload NVIDIA sous NixOS, garde seulement nvidia ici.
+  # PRIME offload NVIDIA sous NixOS.
   services.xserver.videoDrivers = [ "nvidia" ];
 
-  # Si tu as des soucis avec linuxPackages_latest, repasse sur pkgs.linuxPackages.
-  #boot.kernelPackages = pkgs.linuxPackages_latest;
+  # Kernel Zen utilisé par le système.
   boot.kernelPackages = pkgs.linuxPackages_zen;
-  
+
   hardware.nvidia = {
     modesetting.enable = true;
     open = true;
@@ -42,30 +43,21 @@
 
     powerManagement.enable = true;
     powerManagement.finegrained = true;
-    
+
     prime = {
       offload = {
         enable = true;
         enableOffloadCmd = true;
       };
 
-      # IMPORTANT :
-      # Remplace par les vraies valeurs au format NixOS :
-      # PCI:<bus>@<domain>:<device>:<function>
-      #
-      # Exemple si lspci donne :
-      # 0000:05:00.0 -> PCI:5@0:0:0
-      # 0000:01:00.0 -> PCI:1@0:0:0
-      #
-      # Vérifie bien avec :
-      # lspci | grep -E "VGA|3D"
+      # À vérifier avec : lspci | grep -E "VGA|3D"
       amdgpuBusId = "PCI:5@0:0:0";
       nvidiaBusId = "PCI:1@0:0:0";
     };
   };
 
-  
   services.gvfs.enable = true;
+
   networking.hostName = "proprod";
   networking.networkmanager.enable = true;
   networking.firewall.allowedUDPPorts = [ 5353 ];
@@ -80,9 +72,6 @@
       userServices = true;
     };
   };
-
- 
-  
 
   time.timeZone = "Europe/Paris";
 
@@ -120,15 +109,15 @@
     alsa.support32Bit = true;
     pulse.enable = true;
   };
- 
+
   boot.kernel.sysctl = {
-   "vm.max_map_count" = 1048576;
-    };
- 
+    "vm.max_map_count" = 1048576;
+  };
+
   users.users.tux = {
     isNormalUser = true;
     description = "tux";
-    extraGroups = [ "networkmanager" "wheel" "libvirtd"];
+    extraGroups = [ "networkmanager" "wheel" "libvirtd" ];
     packages = with pkgs; [
       plymouth
       adi1090x-plymouth-themes
@@ -152,13 +141,11 @@
       mixxx
       htop
       btop
-      #nvtopPackages.nvidia
       curl
       wget
       gamemode
       git
       anydesk
-      gparted
       nextcloud-client
       flatpak
       docker
@@ -175,14 +162,13 @@
       bazaar
       gnome.gvfs
       samba
+      whatsie
       smbclient-ng
       avahi
-      wakeonlan
       github-desktop
       libnotify
       ocs-url
       telegram-desktop
-      gnome-tweaks
       whitesur-gtk-theme
       whitesur-cursors
       whitesur-icon-theme
@@ -198,48 +184,100 @@
       gnomeExtensions.wallpaper-slideshow
       gnomeExtensions.ip-finder
       gnomeExtensions.gamemode-shell-extension
+      gnomeExtensions.daily-bing-wallpaper
       gnomeExtensions.user-themes
     ];
   };
 
   programs.firefox.enable = false;
-  
+
   environment.gnome.excludePackages = with pkgs; [
-  epiphany
-  yelp
-  gnome-tour
-  gnome-software
+    epiphany
+    yelp
+    gnome-tour
+    gnome-software
   ];
-  
-  system.autoUpgrade = {
+
+  # Mise à jour à chaque démarrage.
+  # La nouvelle génération, notamment le kernel Zen, sera utilisée
+  # au prochain redémarrage.
+    system.autoUpgrade = {
     enable = true;
-    allowReboot = false;
-    dates = "14:00";
+
+    # Channel stable utilisé par votre système
+    channel = "https://channels.nixos.org/nixos-26.05";
+
+    # Tous les jours à 04:00
+    dates = "*-*-* 18:00:00";
+
+    # Délai aléatoire maximal de 45 minutes
     randomizedDelaySec = "45min";
-    flags = [ "--print-build-logs" ];
+
+    # Si l'horaire est manqué, exécuter la mise à jour plus tard
+    persistent = true;
+
+    # Prépare le nouveau kernel pour le prochain démarrage
+    operation = "boot";
+
+    # Ne redémarre pas automatiquement la machine
+    allowReboot = false;
+
+    # Ne pas utiliser --print-build-logs :
+    # cette option provoquait l'erreur avec nix-build.
+    flags = [ ];
   };
   
-  nix.gc = {
-    automatic = true;
-    dates = "weekly";
-    options = "--delete-older-than 7d";
+    #nettoyage du systeme
+      systemd.services.nixos-generations-cleanup = {
+    description = "Nettoyage des anciennes générations NixOS";
+
+    path = [ pkgs.nix ];
+
+    serviceConfig = {
+      Type = "oneshot";
+    };
+
+    script = ''
+      set -euo pipefail
+
+      echo "Conservation des 5 dernières générations système..."
+      nix-env \
+        --profile /nix/var/nix/profiles/system \
+        --delete-generations +5
+
+      echo "Nettoyage des données Nix âgées de plus de 7 jours..."
+      nix-collect-garbage --delete-older-than 7d
+    '';
   };
 
-  nix.settings.auto-optimise-store = true;
+  systemd.timers.nixos-generations-cleanup = {
+    description = "Nettoyage quotidien des générations NixOS";
 
-  nix.optimise = {
-    automatic = true;
-    dates = [ "16:00" ];
-  };
-  
+    wantedBy = [ "timers.target" ];
+
+    timerConfig = {
+      OnCalendar = "*-*-* 19:00:00";
+      RandomizedDelaySec = "30min";
+      Persistent = true;
+      Unit = "nixos-generations-cleanup.service";
+    };
+  }; 
+
   environment.systemPackages = with pkgs; [
     vim
     pciutils
     qemu
     virt-manager
     virt-viewer
+    gnome-tweaks
+    neohtop
+    gnome-multi-writer
+    gparted
+    wakeonlan
+    screenfetch
+    spotify
   ];
-  
+
   virtualisation.libvirtd.enable = true;
   programs.virt-manager.enable = true;
 
