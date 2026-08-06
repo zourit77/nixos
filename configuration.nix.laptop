@@ -5,35 +5,30 @@
     ./hardware-configuration.nix
   ];
 
+  # ============================================================================
+  # BOOT & KERNEL
+  # ============================================================================
   boot.loader.systemd-boot.enable = true;
   boot.loader.efi.canTouchEfiVariables = true;
   boot.loader.timeout = 1;
-  # Limite le nombre de générations affichées dans systemd-boot.
   boot.loader.systemd-boot.configurationLimit = 5;
 
-  programs.gamemode.enable = true;
-  services.gnome.gnome-remote-desktop.enable = false;
-
   boot.kernelParams = [ "quiet" "splash" ];
-
-  nix.settings.experimental-features = [ "nix-command" "flakes" ];
-  nixpkgs.config.allowUnfree = true;
+  boot.kernelPackages = pkgs.linuxPackages_zen;
+  boot.kernel.sysctl = {
+    "vm.max_map_count" = 1048576;
+  };
 
   boot.plymouth.enable = true;
   boot.plymouth.theme = "spinner";
 
-  services.flatpak.enable = true;
-
+  # ============================================================================
+  # HARDWARE & GRAPHISMES
+  # ============================================================================
   hardware.graphics = {
     enable = true;
     enable32Bit = true;
   };
-
-  # PRIME offload NVIDIA sous NixOS.
-  services.xserver.videoDrivers = [ "nvidia" ];
-
-  # Kernel Zen utilisé par le système.
-  boot.kernelPackages = pkgs.linuxPackages_zen;
 
   hardware.nvidia = {
     modesetting.enable = true;
@@ -49,29 +44,19 @@
         enable = true;
         enableOffloadCmd = true;
       };
-
-      # À vérifier avec : lspci | grep -E "VGA|3D"
       amdgpuBusId = "PCI:5@0:0:0";
       nvidiaBusId = "PCI:1@0:0:0";
     };
   };
 
-  services.gvfs.enable = true;
+  services.xserver.videoDrivers = [ "nvidia" ];
 
+  # ============================================================================
+  # SYSTÈME DE BASE
+  # ============================================================================
   networking.hostName = "proprod";
   networking.networkmanager.enable = true;
   networking.firewall.allowedUDPPorts = [ 5353 ];
-
-  services.avahi = {
-    enable = true;
-    nssmdns4 = true;
-    nssmdns6 = true;
-    openFirewall = true;
-    publish = {
-      enable = true;
-      userServices = true;
-    };
-  };
 
   time.timeZone = "Europe/Paris";
 
@@ -88,18 +73,78 @@
     LC_TIME = "fr_FR.UTF-8";
   };
 
+  console.keyMap = "fr";
+
+  # ============================================================================
+  # NIX & CHANNELS
+  # ============================================================================
+  nix.settings.experimental-features = [ "nix-command" "flakes" ];
+  nixpkgs.config.allowUnfree = true;
+
+  system.stateVersion = "26.05";
+
+  # ============================================================================
+  # MISE À JOUR AUTOMATIQUE
+  # ============================================================================
+  system.autoUpgrade = {
+    enable = true;
+    channel = "https://channels.nixos.org/nixos-26.05";
+    dates = "*-*-* 18:00:00";
+    randomizedDelaySec = "45min";
+    persistent = true;
+    operation = "boot";
+    allowReboot = false;
+    flags = [ ];
+  };
+
+  systemd.services.nixos-generations-cleanup = {
+    description = "Nettoyage des anciennes générations NixOS";
+    path = [ pkgs.nix ];
+    serviceConfig = {
+      Type = "oneshot";
+    };
+    script = ''
+      set -euo pipefail
+
+      echo "Conservation des 5 dernières générations système..."
+      nix-env \
+        --profile /nix/var/nix/profiles/system \
+        --delete-generations +5
+
+      echo "Nettoyage des données Nix âgées de plus de 7 jours..."
+      nix-collect-garbage --delete-older-than 7d
+    '';
+  };
+
+  systemd.timers.nixos-generations-cleanup = {
+    description = "Nettoyage quotidien des générations NixOS";
+    wantedBy = [ "timers.target" ];
+    timerConfig = {
+      OnCalendar = "*-*-* 19:00:00";
+      RandomizedDelaySec = "30min";
+      Persistent = true;
+      Unit = "nixos-generations-cleanup.service";
+    };
+  };
+
+  # ============================================================================
+  # DISPLAY MANAGER & DESKTOP
+  # ============================================================================
   services.xserver.enable = true;
   services.displayManager.gdm.enable = true;
   services.desktopManager.gnome.enable = true;
 
-  services.xserver.xkb = {
-    layout = "fr";
-    variant = "";
-  };
+  environment.gnome.excludePackages = with pkgs; [
+    epiphany
+    yelp
+    gnome-tour
+    gnome-software
+  ];
 
-  console.keyMap = "fr";
-
-  services.printing.enable = true;
+  # ============================================================================
+  # SERVICES
+  # ============================================================================
+  services.gvfs.enable = true;
 
   services.pulseaudio.enable = false;
   security.rtkit.enable = true;
@@ -110,10 +155,34 @@
     pulse.enable = true;
   };
 
-  boot.kernel.sysctl = {
-    "vm.max_map_count" = 1048576;
+  services.printing.enable = true;
+
+  services.avahi = {
+    enable = true;
+    nssmdns4 = true;
+    nssmdns6 = true;
+    openFirewall = true;
+    publish = {
+      enable = true;
+      userServices = true;
+    };
   };
 
+  services.flatpak.enable = true;
+
+  programs.gamemode.enable = true;
+
+  services.gnome.gnome-remote-desktop.enable = false;
+
+  # ============================================================================
+  # VIRTUALISATION
+  # ============================================================================
+  virtualisation.libvirtd.enable = true;
+  programs.virt-manager.enable = true;
+
+  # ============================================================================
+  # UTILISATEUR & PACKAGES
+  # ============================================================================
   users.users.tux = {
     isNormalUser = true;
     description = "tux";
@@ -182,87 +251,18 @@
       gnomeExtensions.hide-activities-button
       gnomeExtensions.weatherpanel
       gnomeExtensions.wallpaper-slideshow
-      gnomeExtensions.ip-finder
+      gnomeExtensions.user-themes
       gnomeExtensions.gamemode-shell-extension
       gnomeExtensions.daily-bing-wallpaper
-      gnomeExtensions.user-themes
+      gnomeExtensions.ip-finder
     ];
   };
 
   programs.firefox.enable = false;
 
-  environment.gnome.excludePackages = with pkgs; [
-    epiphany
-    yelp
-    gnome-tour
-    gnome-software
-  ];
-
-  # Mise à jour à chaque démarrage.
-  # La nouvelle génération, notamment le kernel Zen, sera utilisée
-  # au prochain redémarrage.
-    system.autoUpgrade = {
-    enable = true;
-
-    # Channel stable utilisé par votre système
-    channel = "https://channels.nixos.org/nixos-26.05";
-
-    # Tous les jours à 04:00
-    dates = "*-*-* 18:00:00";
-
-    # Délai aléatoire maximal de 45 minutes
-    randomizedDelaySec = "45min";
-
-    # Si l'horaire est manqué, exécuter la mise à jour plus tard
-    persistent = true;
-
-    # Prépare le nouveau kernel pour le prochain démarrage
-    operation = "boot";
-
-    # Ne redémarre pas automatiquement la machine
-    allowReboot = false;
-
-    # Ne pas utiliser --print-build-logs :
-    # cette option provoquait l'erreur avec nix-build.
-    flags = [ ];
-  };
-  
-    #nettoyage du systeme
-      systemd.services.nixos-generations-cleanup = {
-    description = "Nettoyage des anciennes générations NixOS";
-
-    path = [ pkgs.nix ];
-
-    serviceConfig = {
-      Type = "oneshot";
-    };
-
-    script = ''
-      set -euo pipefail
-
-      echo "Conservation des 5 dernières générations système..."
-      nix-env \
-        --profile /nix/var/nix/profiles/system \
-        --delete-generations +5
-
-      echo "Nettoyage des données Nix âgées de plus de 7 jours..."
-      nix-collect-garbage --delete-older-than 7d
-    '';
-  };
-
-  systemd.timers.nixos-generations-cleanup = {
-    description = "Nettoyage quotidien des générations NixOS";
-
-    wantedBy = [ "timers.target" ];
-
-    timerConfig = {
-      OnCalendar = "*-*-* 19:00:00";
-      RandomizedDelaySec = "30min";
-      Persistent = true;
-      Unit = "nixos-generations-cleanup.service";
-    };
-  }; 
-
+  # ============================================================================
+  # PACKAGES SYSTÈME
+  # ============================================================================
   environment.systemPackages = with pkgs; [
     vim
     pciutils
@@ -275,11 +275,7 @@
     gparted
     wakeonlan
     screenfetch
+    vulkan-tools
     spotify
   ];
-
-  virtualisation.libvirtd.enable = true;
-  programs.virt-manager.enable = true;
-
-  system.stateVersion = "26.05";
 }
