@@ -2,32 +2,33 @@
 {
   system.stateVersion = "23.11";
 
-  networking.hostName = "nixos-pizero2w-homelab";
-
-  # DHCP simple sur interface principale (éthernet / wifi via hardware module)
+  networking.hostName = "pi-zero2";
   networking.useDHCP = true;
 
-  # Utilisateur admin simple
-  users.users = {
-    admin = {
-      isNormalUser = true;
-      password = "motdepasse";  # à changer ensuite !
-      extraGroups = [ "wheel" ];
-    };
+  users.users.tonnomutilisateur = {
+    isNormalUser = true;
+    password = "motdepasseutilisateur";  # change-le ensuite
+    extraGroups = [ "wheel" "docker" ];
   };
 
-  # Autoriser sudo pour le groupe wheel
   security.sudo.enable = true;
   security.sudo.wheelNeedsPassword = true;
 
-  # SSH
   services.openssh.enable = true;
   services.openssh.settings.PasswordAuthentication = true;
 
-  # Paquets de base
+  virtualisation.docker.enable = true;
+
+  nixpkgs.config.allowUnfree = true;
+
   environment.systemPackages = with pkgs; [
     vim
     git
     htop
+    curl
+    neofetch
+    docker
+    docker-compose
+    openssh
   ];
 }
