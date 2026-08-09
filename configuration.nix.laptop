@@ -181,6 +181,15 @@
   programs.virt-manager.enable = true;
 
   # ============================================================================
+  # EMULATION AARCH64 (construire un nix-rpi)
+  # ============================================================================
+  boot.binfmt.emulatedSystems = [ "aarch64-linux" ];
+
+  nix.settings.extra-platforms = [
+    "aarch64-linux"
+  ];
+
+  # ============================================================================
   # UTILISATEUR & PACKAGES
   # ============================================================================
   users.users.tux = {
