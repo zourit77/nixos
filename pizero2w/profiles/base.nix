@@ -1,6 +1,8 @@
 { config, pkgs, lib, ... }:
 {
-  system.stateVersion = "23.11";
+  system.stateVersion = "26.05";
+
+  boot.zfs.forceImportRoot = false;
 
   networking.hostName = "pi-zero2";
   networking.useDHCP = true;
