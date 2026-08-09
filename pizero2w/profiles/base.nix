@@ -9,9 +9,9 @@
 
   # Utilisateur admin simple
   users.users = {
-    tux = {
+    admin = {
       isNormalUser = true;
-      password = "Dreamoflight77!!";  # à changer ensuite !
+      password = "motdepasse";  # à changer ensuite !
       extraGroups = [ "wheel" ];
     };
   };
