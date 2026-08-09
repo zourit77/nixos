@@ -17,7 +17,7 @@
   networking.wireless = {
     enable = true;
     networks = {
-      "Aura_Metal".psk = "P@P@2021";
+      "ton_SSID".psk = "motdepassewifi";
     };
   };
 
