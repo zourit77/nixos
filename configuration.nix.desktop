@@ -20,6 +20,13 @@
     "flakes"
   ];
 
+  boot.binfmt.emulatedSystems = [ "aarch64-linux" ];
+
+  nix.settings.extra-platforms = [
+    "aarch64-linux"
+  ];
+
+
   nixpkgs.config.allowUnfree = true;
 
   environment.systemPackages = with pkgs; [
@@ -32,6 +39,8 @@
     git
     pciutils
     dmidecode
+    fastfetch
+    
 
     # Virtualisation et stockage
     qemu
@@ -210,7 +219,7 @@
       steam
       heroic
       gamemode
-      protonup-qt
+      protonplus
 
       # Navigateurs et communication
       brave
@@ -256,6 +265,7 @@
       mesa-demos
       rpi-imager
       libnotify
+      cmatrix
 
       # Thèmes et personnalisation GNOME
       roboto-slab
@@ -325,8 +335,8 @@
   system.autoUpgrade = {
     enable = true;
     channel = "https://channels.nixos.org/nixos-26.05";
-    dates = "*-*-* 18:00:00";
-    randomizedDelaySec = "45min";
+    dates = "Wed 19:00";
+    randomizedDelaySec = "0";
     persistent = true;
     operation = "boot";
     allowReboot = false;
@@ -339,6 +349,10 @@
   ##########################################################################
   # Nettoyage des anciennes générations
   ##########################################################################
+
+  # Optimisation automatique du store Nix (déduplication via hard links)
+  nix.optimise.automatic = true;
+  nix.optimise.dates = [ "Wed 21:00" ];  # heure d'exécution quotidienne (optionnel)
 
   systemd.services.nixos-generations-cleanup = {
     description = "Nettoyage des anciennes générations NixOS";
@@ -366,8 +380,8 @@
     wantedBy = [ "timers.target" ];
 
     timerConfig = {
-      OnCalendar = "*-*-* 19:00:00";
-      RandomizedDelaySec = "30min";
+      OnCalendar = "Wed *-*-* 19:00:00";
+      RandomizedDelaySec = "0";
       Persistent = true;
       Unit = "nixos-generations-cleanup.service";
     };
