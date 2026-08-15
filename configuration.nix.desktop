@@ -40,6 +40,7 @@
     pciutils
     dmidecode
     fastfetch
+    nix-sweep
     
 
     # Virtualisation et stockage
@@ -293,6 +294,7 @@
       gnomeExtensions.wallpaper-slideshow
       gnomeExtensions.ip-finder
       gnomeExtensions.gamemode-shell-extension
+      gnomeExtensions.logo-menu
       gnomeExtensions.daily-bing-wallpaper
       gnomeExtensions.user-themes
     ];
@@ -386,4 +388,22 @@
       Unit = "nixos-generations-cleanup.service";
     };
   };
+
+  ##########################################################################
+  # Configuration des logs systemd-journald
+  ##########################################################################
+
+  services.journald.extraConfig = ''
+    [Journal]
+    # Limite la taille totale des logs persistants à 100M
+    SystemMaxUse=100M
+    # Limite la taille de chaque fichier de log individuel à 100M
+    SystemMaxFileSize=100M
+    # Garde au moins 50M libres sur le disque
+    SystemKeepFree=50M
+    # Limite pour les logs en mémoire (optionnel, si Storage=volatile)
+    RuntimeMaxUse=50M
+    RuntimeMaxFileSize=25M
+  '';
+
 }
