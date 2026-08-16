@@ -6,13 +6,26 @@
   ];
 
   # ============================================================================
-  # BOOT & KERNEL
-  # ============================================================================
-  boot.loader.systemd-boot.enable = true;
-  boot.loader.efi.canTouchEfiVariables = true;
-  boot.loader.timeout = 1;
-  boot.loader.systemd-boot.configurationLimit = 5;
+# BOOT & KERNEL — GRUB UEFI
+# ============================================================================
+boot.loader = {
+  timeout = 1;
 
+  efi = {
+    canTouchEfiVariables = true;
+
+    # À définir uniquement si ta partition EFI est montée sur /boot/efi :
+    # efiSysMountPoint = "/boot/efi";
+  };
+
+  grub = {
+    enable = true;
+    efiSupport = true;
+    device = "nodev";
+    useOSProber = true;
+    configurationLimit = 5;
+  };
+};
   # Plymouth et son écran de démarrage graphique sont supprimés.
   boot.kernelParams = [ "quiet" ];
   boot.kernelPackages = pkgs.linuxPackages;
