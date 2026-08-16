@@ -1,0 +1,280 @@
+{ config, pkgs, ... }:
+
+{
+  imports = [
+    ./hardware-configuration.nix
+  ];
+
+  # ============================================================================
+  # BOOT & KERNEL
+  # ============================================================================
+  boot.loader.systemd-boot.enable = true;
+  boot.loader.efi.canTouchEfiVariables = true;
+  boot.loader.timeout = 1;
+  boot.loader.systemd-boot.configurationLimit = 5;
+
+  boot.kernelParams = [ "quiet" "splash" ];
+  boot.kernelPackages = pkgs.linuxPackages;  # Kernel standard au lieu de zen
+  boot.kernel.sysctl = {
+    "vm.max_map_count" = 1048576;
+  };
+
+  # Plymouth activé²² avec thème brgt
+  boot.plymouth.enable = true;
+  boot.plymouth.theme = "brgt";
+
+  # ============================================================================
+  # HARDWARE & GRAPHISMES
+  # ============================================================================
+  hardware.graphics = {
+    enable = true;
+    # 32-bit désactivé²² pour un usage basique
+    enable32Bit = false;
+  };
+
+  # Configuration Intel Graphics (au lieu de NVIDIA)
+  # Les pilotes Intel sont inclus dans le kernel et Mesa
+  services.xserver.videoDrivers = [ "modesetting" ];
+
+  # ============================================================================
+  # SYSTÈME DE BASE
+  # ============================================================================
+  networking.hostName = "proprod";
+  networking.networkmanager.enable = true;
+  networking.firewall.allowedUDPPorts = [ 5353 ];
+
+  time.timeZone = "Europe/Paris";
+
+  i18n.defaultLocale = "fr_FR.UTF-8";
+  i18n.extraLocaleSettings = {
+    LC_ADDRESS = "fr_FR.UTF-8";
+    LC_IDENTIFICATION = "fr_FR.UTF-8";
+    LC_MEASUREMENT = "fr_FR.UTF-8";
+    LC_MONETARY = "fr_FR.UTF-8";
+    LC_NAME = "fr_FR.UTF-8";
+    LC_NUMERIC = "fr_FR.UTF-8";
+    LC_PAPER = "fr_FR.UTF-8";
+    LC_TELEPHONE = "fr_FR.UTF-8";
+    LC_TIME = "fr_FR.UTF-8";
+  };
+
+  console.keyMap = "fr";
+
+  # ============================================================================
+  # NIX & CHANNELS
+  # ============================================================================
+  nix.settings.experimental-features = [ "nix-command" "flakes" ];
+  nixpkgs.config.allowUnfree = true;
+
+  system.stateVersion = "26.05";
+
+  # ============================================================================
+  # MISE À JOUR AUTOMATIQUE
+  # ============================================================================
+  system.autoUpgrade = {
+    enable = true;
+    channel = "https://channels.nixos.org/nixos-26.05";
+    dates = "Wed *-*-* 19:00:00";
+    randomizedDelaySec = "0";
+    persistent = true;
+    operation = "boot";
+    package = pkgs.nixos;
+  };
+
+  systemd.services.nixos-generations-cleanup = {
+    description = "Nettoyage des anciennes générations NixOS";
+    path = [ pkgs.nix ];
+    serviceConfig = {
+      Type = "oneshot";
+    };
+    script = ''
+      set -euo pipefail
+
+      echo "Conservation des 5 dernières générations système..."
+      nix-env \
+        --profile /nix/var/nix/profiles/system \
+        --delete-generations +5
+
+      echo "Nettoyage des données Nix âgées de plus de 7 jours..."
+      nix-collect-garbage --delete-older-than 7d
+    '';
+  };
+
+  systemd.timers.nixos-generations-cleanup = {
+    description = "Nettoyage quotidien des générations NixOS";
+    wantedBy = [ "timers.target" ];
+    timerConfig = {
+      OnCalendar = "Wed *-*-* 20:00:00";
+      RandomizedDelaySec = "0";
+      Persistent = true;
+      Unit = "nixos-generations-cleanup.service";
+    };
+  };
+
+  ##########################################################################
+  # Configuration des logs systemd-journald
+  ##########################################################################
+
+  services.journald.extraConfig = ''
+    [Journal]
+    # Limite la taille totale des logs persistants à 100M
+    SystemMaxUse=100M
+    # Limite la taille de chaque fichier de log individuel à 100M
+    SystemMaxFileSize=100M
+    # Garde au moins 50M libres sur le disque
+    SystemKeepFree=50M
+    # Limite pour les logs en mémoire (optionnel, si Storage=volatile)
+    RuntimeMaxUse=50M
+    RuntimeMaxFileSize=25M
+  '';
+
+  # ============================================================================
+  # DISPLAY MANAGER & DESKTOP
+  # ============================================================================
+  services.xserver.enable = true;
+  services.displayManager.gdm.enable = true;
+  services.desktopManager.gnome.enable = true;
+
+  environment.gnome.excludePackages = with pkgs; [
+    epiphany
+    yelp
+    gnome-tour
+    gnome-software
+  ];
+
+  # ============================================================================
+  # SERVICES
+  # ============================================================================
+  services.gvfs.enable = true;
+
+  services.pulseaudio.enable = false;
+  security.rtkit.enable = true;
+  services.pipewire = {
+    enable = true;
+    alsa.enable = true;
+    alsa.support32Bit = true;
+    pulse.enable = true;
+  };
+
+  services.printing.enable = true;
+
+  services.avahi = {
+    enable = true;
+    nssmdns4 = true;
+    nssmdns6 = true;
+    openFirewall = true;
+    publish = {
+      enable = true;
+      userServices = true;
+    };
+  };
+
+  services.flatpak.enable = true;
+
+  # Gamemode désactivé²² (inutile sans gaming)
+  programs.gamemode.enable = false;
+
+  services.gnome.gnome-remote-desktop.enable = false;
+
+  # ============================================================================
+  # UTILISATEUR & PACKAGES
+  # ============================================================================
+  users.users.tux = {
+    isNormalUser = true;
+    description = "tux";
+    extraGroups = [ "networkmanager" "wheel" ];
+    packages = with pkgs; [
+      # Plymouth et thèmes
+      plymouth
+      plymouth-themes
+      adi1090x-plymouth-themes
+      plymouth-proxzima-theme
+      plymouth-matrix-theme
+      
+      # Wallpapers NixOS
+      nixos-artwork.wallpapers.binary-black
+      nixos-artwork.wallpapers.gear
+      nixos-artwork.wallpapers.nineish
+      
+      # Logiciels
+      brave
+      parabolic
+      photoflare
+      libreoffice-fresh
+      thunderbird
+      shortwave
+      wireguard-tools
+      jellyfin
+      vlc
+      ffmpeg
+      audacity
+      ardour
+      mixxx
+      htop
+      btop
+      curl
+      wget
+      git
+      anydesk
+      nextcloud-client
+      flatpak
+      docker
+      docker-compose
+      vscodium
+      rpi-imager
+      joplin-desktop
+      transmission_4
+      discord
+      syncthing
+      zoom-us
+      bazaar
+      gnome.gvfs
+      samba
+      whatsie
+      smbclient-ng
+      avahi
+      github-desktop
+      libnotify
+      ocs-url
+      spotify
+      telegram-desktop
+      whitesur-gtk-theme
+      whitesur-cursors
+      whitesur-icon-theme
+      gnomeExtensions.dash-to-dock
+      gnomeExtensions.blur-my-shell
+      gnomeExtensions.coverflow-alt-tab
+      gnomeExtensions.freon
+      gnomeExtensions.appindicator
+      gnomeExtensions.desktop-icons-ng-ding
+      gnomeExtensions.clipboard-history
+      gnomeExtensions.hide-activities-button
+      gnomeExtensions.weatherpanel
+      gnomeExtensions.wallpaper-slideshow
+      gnomeExtensions.user-themes
+      # Gamemode extension supprimé²²e
+      gnomeExtensions.daily-bing-wallpaper
+      gnomeExtensions.ip-finder
+    ];
+  };
+
+  programs.firefox.enable = false;
+
+  # ============================================================================
+  # PACKAGES SYSTÈ²ME
+  # ============================================================================
+  environment.systemPackages = with pkgs; [
+    vim
+    pciutils
+    gnome-tweaks
+    neohtop
+    gnome-multi-writer
+    gparted
+    wakeonlan
+    fastfetch
+    android-tools
+    shadow
+    unzip
+    roboto-slab
+  ];
+}
