@@ -78,7 +78,7 @@
     randomizedDelaySec = "0";
     persistent = true;
     operation = "boot";
-    package = pkgs.nixos;
+    #package = pkgs.nixos;
   };
 
   systemd.services.nixos-generations-cleanup = {
