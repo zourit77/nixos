@@ -13,27 +13,21 @@
   boot.loader.timeout = 1;
   boot.loader.systemd-boot.configurationLimit = 5;
 
-  boot.kernelParams = [ "quiet" "splash" ];
-  boot.kernelPackages = pkgs.linuxPackages;  # Kernel standard au lieu de zen
+  # Plymouth et son écran de démarrage graphique sont supprimés.
+  boot.kernelParams = [ "quiet" ];
+  boot.kernelPackages = pkgs.linuxPackages;
   boot.kernel.sysctl = {
     "vm.max_map_count" = 1048576;
   };
-
-  # Plymouth activé²² avec thème brgt
-  boot.plymouth.enable = true;
-  boot.plymouth.theme = "brgt";
 
   # ============================================================================
   # HARDWARE & GRAPHISMES
   # ============================================================================
   hardware.graphics = {
     enable = true;
-    # 32-bit désactivé²² pour un usage basique
     enable32Bit = false;
   };
 
-  # Configuration Intel Graphics (au lieu de NVIDIA)
-  # Les pilotes Intel sont inclus dans le kernel et Mesa
   services.xserver.videoDrivers = [ "modesetting" ];
 
   # ============================================================================
@@ -78,7 +72,6 @@
     randomizedDelaySec = "0";
     persistent = true;
     operation = "boot";
-    #package = pkgs.nixos;
   };
 
   systemd.services.nixos-generations-cleanup = {
@@ -101,7 +94,7 @@
   };
 
   systemd.timers.nixos-generations-cleanup = {
-    description = "Nettoyage quotidien des générations NixOS";
+    description = "Nettoyage hebdomadaire des générations NixOS";
     wantedBy = [ "timers.target" ];
     timerConfig = {
       OnCalendar = "Wed *-*-* 20:00:00";
@@ -111,19 +104,14 @@
     };
   };
 
-  ##########################################################################
-  # Configuration des logs systemd-journald
-  ##########################################################################
-
+  # ============================================================================
+  # LOGS SYSTEMD-JOURNALD
+  # ============================================================================
   services.journald.extraConfig = ''
     [Journal]
-    # Limite la taille totale des logs persistants à 100M
     SystemMaxUse=100M
-    # Limite la taille de chaque fichier de log individuel à 100M
     SystemMaxFileSize=100M
-    # Garde au moins 50M libres sur le disque
     SystemKeepFree=50M
-    # Limite pour les logs en mémoire (optionnel, si Storage=volatile)
     RuntimeMaxUse=50M
     RuntimeMaxFileSize=25M
   '';
@@ -170,10 +158,7 @@
   };
 
   services.flatpak.enable = true;
-
-  # Gamemode désactivé²² (inutile sans gaming)
   programs.gamemode.enable = false;
-
   services.gnome.gnome-remote-desktop.enable = false;
 
   # ============================================================================
@@ -184,19 +169,10 @@
     description = "tux";
     extraGroups = [ "networkmanager" "wheel" ];
     packages = with pkgs; [
-      # Plymouth et thèmes
-      plymouth
-      plymouth-themes
-      adi1090x-plymouth-themes
-      plymouth-proxzima-theme
-      plymouth-matrix-theme
-      
-      # Wallpapers NixOS
       nixos-artwork.wallpapers.binary-black
       nixos-artwork.wallpapers.gear
       nixos-artwork.wallpapers.nineish
-      
-      # Logiciels
+
       brave
       parabolic
       photoflare
@@ -252,7 +228,6 @@
       gnomeExtensions.weatherpanel
       gnomeExtensions.wallpaper-slideshow
       gnomeExtensions.user-themes
-      # Gamemode extension supprimé²²e
       gnomeExtensions.daily-bing-wallpaper
       gnomeExtensions.ip-finder
     ];
@@ -261,7 +236,7 @@
   programs.firefox.enable = false;
 
   # ============================================================================
-  # PACKAGES SYSTÈ²ME
+  # PACKAGES SYSTÈME
   # ============================================================================
   environment.systemPackages = with pkgs; [
     vim
