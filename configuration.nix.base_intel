@@ -39,7 +39,7 @@
   # ============================================================================
   # SYSTÈME DE BASE
   # ============================================================================
-  networking.hostName = "nic=x-pc-intel";
+  networking.hostName = "nicx-pc-intel";
   networking.networkmanager.enable = true;
   networking.firewall.allowedUDPPorts = [ 5353 ];
 
