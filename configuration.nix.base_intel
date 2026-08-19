@@ -1,154 +1,83 @@
-{ config, pkgs, ... }:
+{ config, pkgs, lib, ... }:
 
 {
+  # Généralement généré par `nixos-generate-config`
   imports = [
     ./hardware-configuration.nix
   ];
 
-  # ============================================================================
-# BOOT & KERNEL — GRUB UEFI
-# ============================================================================
-boot.loader = {
-  timeout = 1;
+  # -----------------------------------------------------------
+  # Base système
+  # -----------------------------------------------------------
 
-  efi = {
-    canTouchEfiVariables = true;
+  # À adapter selon ton installation existante.
+  # Ne change pas stateVersion au hasard si tu as déjà un système installé.
+  # Exemple : "24.11", "25.05", etc.
+  system.stateVersion = "24.11";
 
-    # À définir uniquement si ta partition EFI est montée sur /boot/efi :
-    # efiSysMountPoint = "/boot/efi";
-  };
+  nixpkgs.hostPlatform = "x86_64-linux";
 
-  grub = {
-    enable = true;
-    efiSupport = true;
-    device = "nodev";
-    useOSProber = true;
-    configurationLimit = 5;
-  };
-};
-  # Plymouth et son écran de démarrage graphique sont supprimés.
-  boot.kernelParams = [ "quiet" ];
-  boot.kernelPackages = pkgs.linuxPackages;
-  boot.kernel.sysctl = {
-    "vm.max_map_count" = 1048576;
-  };
-
-  # ============================================================================
-  # HARDWARE & GRAPHISMES
-  # ============================================================================
-  hardware.graphics = {
-    enable = true;
-    enable32Bit = false;
-  };
-
-  services.xserver.videoDrivers = [ "modesetting" ];
-
-  # ============================================================================
-  # SYSTÈME DE BASE
-  # ============================================================================
-  networking.hostName = "nicx-pc-intel";
-  networking.networkmanager.enable = true;
-  networking.firewall.allowedUDPPorts = [ 5353 ];
-
-  time.timeZone = "Europe/Paris";
-
-  i18n.defaultLocale = "fr_FR.UTF-8";
-  i18n.extraLocaleSettings = {
-    LC_ADDRESS = "fr_FR.UTF-8";
-    LC_IDENTIFICATION = "fr_FR.UTF-8";
-    LC_MEASUREMENT = "fr_FR.UTF-8";
-    LC_MONETARY = "fr_FR.UTF-8";
-    LC_NAME = "fr_FR.UTF-8";
-    LC_NUMERIC = "fr_FR.UTF-8";
-    LC_PAPER = "fr_FR.UTF-8";
-    LC_TELEPHONE = "fr_FR.UTF-8";
-    LC_TIME = "fr_FR.UTF-8";
-  };
-
-  console.keyMap = "fr";
-
-  # ============================================================================
-  # NIX & CHANNELS
-  # ============================================================================
-  nix.settings.experimental-features = [ "nix-command" "flakes" ];
+  # Autorise les paquets non libres si besoin
+  # (firmwares, certains drivers, codecs, etc.)
   nixpkgs.config.allowUnfree = true;
 
-  system.stateVersion = "26.05";
+  # Nom de la machine
+  networking.hostName = "nixos-intel";
 
-  # ============================================================================
-  # MISE À JOUR AUTOMATIQUE
-  # ============================================================================
-  system.autoUpgrade = {
+  # -----------------------------------------------------------
+  # Bootloader GRUB
+  # -----------------------------------------------------------
+
+  # Configuration GRUB pour UEFI (PC portable moderne)
+  boot.loader.grub = {
     enable = true;
-    channel = "https://channels.nixos.org/nixos-26.05";
-    dates = "Wed *-*-* 19:00:00";
-    randomizedDelaySec = "0";
-    persistent = true;
-    operation = "boot";
+    efiSupport = true;
+    device = "nodev";  # Nécessaire pour UEFI
+    
+    # Timeout de boot à 1 seconde
+    timeout = 1;
+    
+    # Thème sleek-grub-theme
+    theme = "${pkgs.sleek-grub-theme}/grub/themes/sleek";
+    
+    # Optionnel : afficher le menu même si timeout = 1
+    # Si tu veux que le menu soit toujours visible pendant 1 seconde
+    splashImage = null;
+    
+    # Si tu veux un menu GRUB plus visible au démarrage
+    # useOSProber = true;  # Pour détecter d'autres OS (Windows, etc.)
+    # configurationLimit = 10;  # Limite le nombre d'entrées GRUB
   };
+  
+  boot.loader.efi.canTouchEfiVariables = true;
 
-  systemd.services.nixos-generations-cleanup = {
-    description = "Nettoyage des anciennes générations NixOS";
-    path = [ pkgs.nix ];
-    serviceConfig = {
-      Type = "oneshot";
-    };
-    script = ''
-      set -euo pipefail
+  # -----------------------------------------------------------
+  # Matériel Intel / portable
+  # -----------------------------------------------------------
 
-      echo "Conservation des 5 dernières générations système..."
-      nix-env \
-        --profile /nix/var/nix/profiles/system \
-        --delete-generations +5
+  # Microcode Intel
+  hardware.cpu.intel.updateMicrocode = true;
 
-      echo "Nettoyage des données Nix âgées de plus de 7 jours..."
-      nix-collect-garbage --delete-older-than 7d
-    '';
-  };
+  # Firmwares redistribuables
+  hardware.enableRedistributableFirmware = true;
 
-  systemd.timers.nixos-generations-cleanup = {
-    description = "Nettoyage hebdomadaire des générations NixOS";
-    wantedBy = [ "timers.target" ];
-    timerConfig = {
-      OnCalendar = "Wed *-*-* 20:00:00";
-      RandomizedDelaySec = "0";
-      Persistent = true;
-      Unit = "nixos-generations-cleanup.service";
-    };
-  };
+  # Gestion thermique Intel
+  services.thermald.enable = true;
 
-  # ============================================================================
-  # LOGS SYSTEMD-JOURNALD
-  # ============================================================================
-  services.journald.extraConfig = ''
-    [Journal]
-    SystemMaxUse=100M
-    SystemMaxFileSize=100M
-    SystemKeepFree=50M
-    RuntimeMaxUse=50M
-    RuntimeMaxFileSize=25M
-  '';
+  # GNOME utilise power-profiles-daemon pour le mode économie/performance.
+  # Évite d'activer TLP en même temps.
+  services.power-profiles-daemon.enable = true;
 
-  # ============================================================================
-  # DISPLAY MANAGER & DESKTOP
-  # ============================================================================
-  services.xserver.enable = true;
-  services.displayManager.gdm.enable = true;
-  services.desktopManager.gnome.enable = true;
+  # Gestion batterie / suspension
+  services.upower.enable = true;
 
-  environment.gnome.excludePackages = with pkgs; [
-    epiphany
-    yelp
-    gnome-tour
-    gnome-software
-  ];
+  # Bluetooth
+  hardware.bluetooth.enable = true;
 
-  # ============================================================================
-  # SERVICES
-  # ============================================================================
-  services.gvfs.enable = true;
+  # Réseau
+  networking.networkmanager.enable = true;
 
-  services.pulseaudio.enable = false;
+  # Audio
   security.rtkit.enable = true;
   services.pipewire = {
     enable = true;
@@ -157,112 +86,155 @@ boot.loader = {
     pulse.enable = true;
   };
 
-  services.printing.enable = true;
+  # -----------------------------------------------------------
+  # Locale / clavier / timezone
+  # -----------------------------------------------------------
 
-  services.avahi = {
-    enable = true;
-    nssmdns4 = true;
-    nssmdns6 = true;
-    openFirewall = true;
-    publish = {
-      enable = true;
-      userServices = true;
-    };
-  };
+  time.timeZone = "Europe/Paris";
+  i18n.defaultLocale = "fr_FR.UTF-8";
 
-  services.flatpak.enable = true;
-  programs.gamemode.enable = false;
-  services.gnome.gnome-remote-desktop.enable = false;
+  # Clavier français
+  services.xserver.xkb.layout = "fr";
+  console.keyMap = "fr";
 
-  # ============================================================================
-  # UTILISATEUR & PACKAGES
-  # ============================================================================
-  users.users.tux = {
+  # -----------------------------------------------------------
+  # GNOME Desktop
+  # -----------------------------------------------------------
+
+  services.xserver.enable = true;
+
+  # Touchpad
+  services.xserver.libinput.enable = true;
+
+  # GDM + GNOME
+  services.xserver.displayManager.gdm.enable = true;
+  services.xserver.desktopManager.gnome.enable = true;
+
+  # Utile pour le montage de périphériques, MTP, etc.
+  services.gvfs.enable = true;
+
+  # -----------------------------------------------------------
+  # Utilisateurs
+  # -----------------------------------------------------------
+
+  users.users.jerome = {
     isNormalUser = true;
-    description = "tux";
-    extraGroups = [ "networkmanager" "wheel" ];
-    packages = with pkgs; [
-      nixos-artwork.wallpapers.binary-black
-      nixos-artwork.wallpapers.gear
-      nixos-artwork.wallpapers.nineish
-
-      brave
-      parabolic
-      photoflare
-      libreoffice-fresh
-      thunderbird
-      shortwave
-      wireguard-tools
-      jellyfin
-      vlc
-      ffmpeg
-      audacity
-      ardour
-      mixxx
-      htop
-      btop
-      curl
-      wget
-      git
-      anydesk
-      nextcloud-client
-      flatpak
-      docker
-      docker-compose
-      vscodium
-      rpi-imager
-      joplin-desktop
-      transmission_4
-      discord
-      syncthing
-      zoom-us
-      bazaar
-      gnome.gvfs
-      samba
-      whatsie
-      smbclient-ng
-      avahi
-      github-desktop
-      libnotify
-      ocs-url
-      spotify
-      telegram-desktop
-      whitesur-gtk-theme
-      whitesur-cursors
-      whitesur-icon-theme
-      gnomeExtensions.dash-to-dock
-      gnomeExtensions.blur-my-shell
-      gnomeExtensions.coverflow-alt-tab
-      gnomeExtensions.freon
-      gnomeExtensions.appindicator
-      gnomeExtensions.desktop-icons-ng-ding
-      gnomeExtensions.clipboard-history
-      gnomeExtensions.hide-activities-button
-      gnomeExtensions.weatherpanel
-      gnomeExtensions.wallpaper-slideshow
-      gnomeExtensions.user-themes
-      gnomeExtensions.daily-bing-wallpaper
-      gnomeExtensions.ip-finder
+    description = "Jerome";
+    extraGroups = [
+      "wheel"
+      "networkmanager"
+      "audio"
+      "video"
     ];
   };
 
-  programs.firefox.enable = false;
+  # -----------------------------------------------------------
+  # Paquets GNOME + WhiteSur
+  # -----------------------------------------------------------
 
-  # ============================================================================
-  # PACKAGES SYSTÈME
-  # ============================================================================
   environment.systemPackages = with pkgs; [
-    vim
-    pciutils
     gnome-tweaks
-    neohtop
-    gnome-multi-writer
-    gparted
-    wakeonlan
-    fastfetch
-    android-tools
-    shadow
-    unzip
-    roboto-slab
+
+    # Thèmes WhiteSur
+    whitesur-gtk-theme
+    whitesur-icon-theme
+
+    # Quelques outils de base
+    git
+    vim
+    wget
+    curl
   ];
+
+  # -----------------------------------------------------------
+  # Activation du thème WhiteSur via dconf
+  # -----------------------------------------------------------
+
+  programs.dconf.enable = true;
+
+  # Profil dconf utilisateur + base système
+  environment.etc."dconf/profile/user".text = ''
+    user-db:user
+    system-db:local
+  '';
+
+  # Réglages GNOME par défaut.
+  # Si tu préfères le thème sombre, remplace :
+  # gtk-theme='WhiteSur-Light'
+  # par :
+  # gtk-theme='WhiteSur-Dark'
+  environment.etc."dconf/db/local.d/00-whitesur".text = ''
+    [org/gnome/desktop/interface]
+    gtk-theme='WhiteSur-Light'
+    icon-theme='WhiteSur'
+    color-scheme='default'
+  '';
+
+  # Met à jour la base dconf après activation du système.
+  system.activationScripts.update-dconf = {
+    deps = [ "etc" ];
+    text = ''
+      ${pkgs.dconf}/bin/dconf update || true
+    '';
+  };
+
+  # -----------------------------------------------------------
+  # Mises à jour automatiques sur unstable
+  # -----------------------------------------------------------
+
+  # Prérequis : avoir le channel `nixos` pointant vers nixos-unstable.
+  #
+  # sudo nix-channel --add https://nixos.org/channels/nixos-unstable nixos
+  # sudo nix-channel --update
+  #
+  # Ensuite cette config activera une mise à jour périodique.
+  system.autoUpgrade = {
+    enable = true;
+
+    # Branche instable
+    channel = "https://nixos.org/channels/nixos-unstable";
+
+    # Heure de mise à jour.
+    # Format systemd OnCalendar.
+    dates = "04:30";
+
+    # false = ne pas redémarrer automatiquement.
+    # true = redémarre si nécessaire après installation.
+    allowReboot = false;
+  };
+
+  # -----------------------------------------------------------
+  # Nettoyage / purge / optimisation du store Nix
+  # -----------------------------------------------------------
+
+  nix.settings = {
+    # Pratique pour les commandes modernes et flakes
+    experimental-features = [
+      "nix-command"
+      "flakes"
+    ];
+
+    # Optimise les liens du store au fur et à mesure
+    auto-optimise-store = true;
+  };
+
+  # Garbage collection automatique :
+  # purge les anciennes générations / chemins inutilisés.
+  nix.gc = {
+    automatic = true;
+    dates = "weekly";
+    options = "--delete-older-than 30d";
+  };
+
+  # Optimisation du store :
+  # déduplication / optimisation des fichiers identiques.
+  nix.optimise = {
+    automatic = true;
+    dates = [ "05:30" ];
+  };
+
+  # Limite un peu la taille des logs systemd
+  services.journald.extraConfig = ''
+    SystemMaxUse=150M
+  '';
 }
