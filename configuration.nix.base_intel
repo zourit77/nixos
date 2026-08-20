@@ -1,7 +1,6 @@
 { config, pkgs, lib, ... }:
 
 {
-  # Généralement généré par `nixos-generate-config`
   imports = [
     ./hardware-configuration.nix
   ];
@@ -10,74 +9,61 @@
   # Base système
   # -----------------------------------------------------------
 
-  # À adapter selon ton installation existante.
-  # Ne change pas stateVersion au hasard si tu as déjà un système installé.
-  # Exemple : "24.11", "25.05", etc.
+  # À adapter à ton installation (ne pas changer au hasard)
   system.stateVersion = "24.11";
 
   nixpkgs.hostPlatform = "x86_64-linux";
-
-  # Autorise les paquets non libres si besoin
-  # (firmwares, certains drivers, codecs, etc.)
   nixpkgs.config.allowUnfree = true;
 
-  # Nom de la machine
   networking.hostName = "nixos-intel";
 
   # -----------------------------------------------------------
-  # Bootloader GRUB
+  # Bootloader : GRUB *ou* systemd-boot (jamais les deux)
   # -----------------------------------------------------------
 
-  # Configuration GRUB pour UEFI (PC portable moderne)
+  # Délai du menu de démarrage : 1 seconde
+  # (option générique, marche avec GRUB et systemd-boot)
+  boot.loader.timeout = 1;
+
+  boot.loader.efi.canTouchEfiVariables = true;
+
+  # --- OPTION 1 : GRUB (activé) ---
   boot.loader.grub = {
     enable = true;
     efiSupport = true;
-    device = "nodev";  # Nécessaire pour UEFI
-    
-    # Timeout de boot à 1 seconde
-    timeout = 1;
-    
-    # Thème sleek-grub-theme
-    theme = "${pkgs.sleek-grub-theme}/grub/themes/sleek";
-    
-    # Optionnel : afficher le menu même si timeout = 1
-    # Si tu veux que le menu soit toujours visible pendant 1 seconde
+    device = "nodev";        # UEFI
     splashImage = null;
-    
-    # Si tu veux un menu GRUB plus visible au démarrage
-    # useOSProber = true;  # Pour détecter d'autres OS (Windows, etc.)
-    # configurationLimit = 10;  # Limite le nombre d'entrées GRUB
+
+    # Thème sleek-grub-theme (style bigSur pour matcher WhiteSur)
+    # withStyle possibles : "bigSur", "dark", "light", "orange"
+    theme = (pkgs.sleek-grub-theme.override {
+      withBanner = "NixOS";
+      withStyle = "bigSur";
+    });
   };
-  
-  boot.loader.efi.canTouchEfiVariables = true;
+
+  # --- OPTION 2 : systemd-boot (désactivé) ---
+  # Pour basculer : commente le bloc grub ci-dessus
+  # et décommente la ligne ci-dessous.
+  # boot.loader.systemd-boot.enable = true;
+
+  # Nettoie /tmp au boot
+  boot.tmp.cleanOnBoot = true;
 
   # -----------------------------------------------------------
   # Matériel Intel / portable
   # -----------------------------------------------------------
 
-  # Microcode Intel
   hardware.cpu.intel.updateMicrocode = true;
-
-  # Firmwares redistribuables
   hardware.enableRedistributableFirmware = true;
 
-  # Gestion thermique Intel
   services.thermald.enable = true;
-
-  # GNOME utilise power-profiles-daemon pour le mode économie/performance.
-  # Évite d'activer TLP en même temps.
   services.power-profiles-daemon.enable = true;
-
-  # Gestion batterie / suspension
   services.upower.enable = true;
 
-  # Bluetooth
   hardware.bluetooth.enable = true;
-
-  # Réseau
   networking.networkmanager.enable = true;
 
-  # Audio
   security.rtkit.enable = true;
   services.pipewire = {
     enable = true;
@@ -92,8 +78,6 @@
 
   time.timeZone = "Europe/Paris";
   i18n.defaultLocale = "fr_FR.UTF-8";
-
-  # Clavier français
   services.xserver.xkb.layout = "fr";
   console.keyMap = "fr";
 
@@ -102,15 +86,9 @@
   # -----------------------------------------------------------
 
   services.xserver.enable = true;
-
-  # Touchpad
   services.xserver.libinput.enable = true;
-
-  # GDM + GNOME
   services.xserver.displayManager.gdm.enable = true;
   services.xserver.desktopManager.gnome.enable = true;
-
-  # Utile pour le montage de périphériques, MTP, etc.
   services.gvfs.enable = true;
 
   # -----------------------------------------------------------
@@ -120,12 +98,7 @@
   users.users.jerome = {
     isNormalUser = true;
     description = "Jerome";
-    extraGroups = [
-      "wheel"
-      "networkmanager"
-      "audio"
-      "video"
-    ];
+    extraGroups = [ "wheel" "networkmanager" "audio" "video" ];
   };
 
   # -----------------------------------------------------------
@@ -134,19 +107,15 @@
 
   environment.systemPackages = with pkgs; [
     gnome-tweaks
-
-    # Thèmes WhiteSur
     whitesur-gtk-theme
     whitesur-icon-theme
-
-    # Quelques outils de base
     git
     vim
     wget
     curl
   ];
 
-    # -----------------------------------------------------------
+  # -----------------------------------------------------------
   # Activation du thème WhiteSur via dconf
   # -----------------------------------------------------------
 
@@ -176,24 +145,10 @@
   # Mises à jour automatiques sur unstable
   # -----------------------------------------------------------
 
-  # Prérequis : avoir le channel `nixos` pointant vers nixos-unstable.
-  #
-  # sudo nix-channel --add https://nixos.org/channels/nixos-unstable nixos
-  # sudo nix-channel --update
-  #
-  # Ensuite cette config activera une mise à jour périodique.
   system.autoUpgrade = {
     enable = true;
-
-    # Branche instable
     channel = "https://nixos.org/channels/nixos-unstable";
-
-    # Heure de mise à jour.
-    # Format systemd OnCalendar.
     dates = "04:30";
-
-    # false = ne pas redémarrer automatiquement.
-    # true = redémarre si nécessaire après installation.
     allowReboot = false;
   };
 
@@ -202,32 +157,21 @@
   # -----------------------------------------------------------
 
   nix.settings = {
-    # Pratique pour les commandes modernes et flakes
-    experimental-features = [
-      "nix-command"
-      "flakes"
-    ];
-
-    # Optimise les liens du store au fur et à mesure
+    experimental-features = [ "nix-command" "flakes" ];
     auto-optimise-store = true;
   };
 
-  # Garbage collection automatique :
-  # purge les anciennes générations / chemins inutilisés.
   nix.gc = {
     automatic = true;
     dates = "weekly";
     options = "--delete-older-than 30d";
   };
 
-  # Optimisation du store :
-  # déduplication / optimisation des fichiers identiques.
   nix.optimise = {
     automatic = true;
     dates = [ "05:30" ];
   };
 
-  # Limite un peu la taille des logs systemd
   services.journald.extraConfig = ''
     SystemMaxUse=150M
   '';
