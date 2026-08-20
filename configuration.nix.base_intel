@@ -146,37 +146,31 @@
     curl
   ];
 
-  # -----------------------------------------------------------
+    # -----------------------------------------------------------
   # Activation du thème WhiteSur via dconf
   # -----------------------------------------------------------
 
   programs.dconf.enable = true;
 
-  # Profil dconf utilisateur + base système
-  environment.etc."dconf/profile/user".text = ''
-    user-db:user
-    system-db:local
-  '';
-
-  # Réglages GNOME par défaut.
+  # Réglages GNOME par défaut pour le profil "user".
+  # Le module dconf génère lui-même /etc/dconf (profil + base compilée),
+  # il ne faut DONC PAS passer par environment.etc."dconf/...".
+  #
   # Si tu préfères le thème sombre, remplace :
-  # gtk-theme='WhiteSur-Light'
+  # gtk-theme = "WhiteSur-Light";
   # par :
-  # gtk-theme='WhiteSur-Dark'
-  environment.etc."dconf/db/local.d/00-whitesur".text = ''
-    [org/gnome/desktop/interface]
-    gtk-theme='WhiteSur-Light'
-    icon-theme='WhiteSur'
-    color-scheme='default'
-  '';
-
-  # Met à jour la base dconf après activation du système.
-  system.activationScripts.update-dconf = {
-    deps = [ "etc" ];
-    text = ''
-      ${pkgs.dconf}/bin/dconf update || true
-    '';
-  };
+  # gtk-theme = "WhiteSur-Dark";
+  programs.dconf.profiles.user.databases = [
+    {
+      settings = {
+        "org/gnome/desktop/interface" = {
+          gtk-theme = "WhiteSur-Light";
+          icon-theme = "WhiteSur";
+          color-scheme = "default";
+        };
+      };
+    }
+  ];
 
   # -----------------------------------------------------------
   # Mises à jour automatiques sur unstable
