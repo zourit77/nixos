@@ -64,7 +64,7 @@
   boot.loader.efi.canTouchEfiVariables = true;
   boot.loader.timeout = 1;
 
-  boot.kernelPackages = pkgs.linuxPackages_zen;
+  boot.kernelPackages = pkgs.linuxPackages_latest;
   boot.kernelParams = [
     "quiet"
     "splash"
@@ -242,7 +242,7 @@
       jellyfin-desktop
 
       # Bureautique, édition et développement
-      libreoffice-fresh
+      libreoffice-stable
       photoflare
       vscodium
       github-desktop
@@ -267,12 +267,23 @@
       rpi-imager
       libnotify
       cmatrix
+      python3
+      unzip
+      sassc
+      glib
+      glibtool
 
       # Thèmes et personnalisation GNOME
       roboto-slab
       whitesur-gtk-theme
+      gruvbox-gtk-theme
+      #tokyonight-gtk-theme
+      fluent-gtk-theme
+      #mojave-gtk-theme
+      #kanagawa-gtk-theme
       whitesur-cursors
       whitesur-icon-theme
+      flat-remix-icon-theme
       nixos-artwork.wallpapers.moonscape
       nixos-artwork.wallpapers.gear
       adi1090x-plymouth-themes
@@ -297,6 +308,8 @@
       gnomeExtensions.logo-menu
       gnomeExtensions.daily-bing-wallpaper
       gnomeExtensions.user-themes
+      gnomeExtensions.transparent-windows
+      gnomeExtensions.compiz-alike-magic-lamp-effect
     ];
   };
 
@@ -336,7 +349,7 @@
 
   system.autoUpgrade = {
     enable = true;
-    channel = "https://channels.nixos.org/nixos-26.05";
+    channel = "https://channels.nixos.org/nixos-unstable";
     dates = "Wed 19:00";
     randomizedDelaySec = "0";
     persistent = true;
@@ -390,20 +403,17 @@
   };
 
   ##########################################################################
-  # Configuration des logs systemd-journald
-  ##########################################################################
+# Configuration des logs systemd-journald
+##########################################################################
 
-  services.journald.extraConfig = ''
-    [Journal]
-    # Limite la taille totale des logs persistants à 100M
-    SystemMaxUse=100M
-    # Limite la taille de chaque fichier de log individuel à 100M
-    SystemMaxFileSize=100M
-    # Garde au moins 50M libres sur le disque
-    SystemKeepFree=50M
-    # Limite pour les logs en mémoire (optionnel, si Storage=volatile)
-    RuntimeMaxUse=50M
-    RuntimeMaxFileSize=25M
-  '';
+services.journald.settings.Journal = {
+  Storage = "persistent";
+  SystemMaxUse = "100M";
+  SystemMaxFileSize = "100M";
+  SystemKeepFree = "50M";
+  RuntimeMaxUse = "50M";
+  RuntimeMaxFileSize = "25M";
+  Compress = true;
+};
 
 }
