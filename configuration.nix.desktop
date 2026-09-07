@@ -310,6 +310,7 @@
       gnomeExtensions.user-themes
       gnomeExtensions.transparent-windows
       gnomeExtensions.compiz-alike-magic-lamp-effect
+      gnomeExtensions.focus
     ];
   };
 
