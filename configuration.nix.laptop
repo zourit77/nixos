@@ -14,7 +14,7 @@
   boot.loader.systemd-boot.configurationLimit = 5;
 
   boot.kernelParams = [ "quiet" "splash" ];
-  boot.kernelPackages = pkgs.linuxPackages_zen;
+  boot.kernelPackages = pkgs.linuxPackages_latest;
   boot.kernel.sysctl = {
     "vm.max_map_count" = 1048576;
   };
@@ -88,7 +88,7 @@
   # ============================================================================
   system.autoUpgrade = {
     enable = true;
-    channel = "https://channels.nixos.org/nixos-26.05";
+    channel = "https://channels.nixos.org/nixos-unstable";
     dates = "Wed *-*-* 19:00:00";
     randomizedDelaySec = "0";
     persistent = true;
@@ -109,10 +109,10 @@
       echo "Conservation des 5 dernières générations système..."
       nix-env \
         --profile /nix/var/nix/profiles/system \
-        --delete-generations +5
+        --delete-generations +3
 
       echo "Nettoyage des données Nix âgées de plus de 7 jours..."
-      nix-collect-garbage --delete-older-than 7d
+      nix-collect-garbage --delete-older-than 3d
     '';
   };
 
@@ -128,21 +128,31 @@
   };
 
   ##########################################################################
-  # Configuration des logs systemd-journald
-  ##########################################################################
+  # optimisation du store
+  #########################################################################
 
-  services.journald.extraConfig = ''
-    [Journal]
-    # Limite la taille totale des logs persistants à 100M
-    SystemMaxUse=100M
-    # Limite la taille de chaque fichier de log individuel à 100M
-    SystemMaxFileSize=100M
-    # Garde au moins 50M libres sur le disque
-    SystemKeepFree=50M
-    # Limite pour les logs en mémoire (optionnel, si Storage=volatile)
-    RuntimeMaxUse=50M
-    RuntimeMaxFileSize=25M
-  '';
+  nix.settings.auto-optimise-store = true;
+
+  ##########################################################################
+  # activation syncthing
+  ##########################################################################  
+
+  services.syncthing.enable = true;
+  services.syncthing.openDefaultPorts = true;
+
+  ##########################################################################
+# Configuration des logs systemd-journald
+##########################################################################
+
+services.journald.settings.Journal = {
+  Storage = "persistent";
+  SystemMaxUse = "100M";
+  SystemMaxFileSize = "100M";
+  SystemKeepFree = "50M";
+  RuntimeMaxUse = "50M";
+  RuntimeMaxFileSize = "25M";
+  Compress = true;
+};
 
   # ============================================================================
   # DISPLAY MANAGER & DESKTOP
@@ -156,6 +166,7 @@
     yelp
     gnome-tour
     gnome-software
+    
   ];
 
   # ============================================================================
@@ -223,7 +234,9 @@
       photoflare
       steam
       heroic
-      libreoffice-fresh
+      prismlauncher
+      nmap
+      libreoffice-stable
       thunderbird
       shortwave
       wireguard-tools
@@ -262,6 +275,7 @@
       smbclient-ng
       avahi
       github-desktop
+      qbittorrent
       libnotify
       ocs-url
       spotify
@@ -269,12 +283,14 @@
       whitesur-gtk-theme
       whitesur-cursors
       whitesur-icon-theme
+      moka-icon-theme
+      nordzy-icon-theme
       gnomeExtensions.dash-to-dock
-      gnomeExtensions.blur-my-shell
+      #gnomeExtensions.blur-my-shell
       gnomeExtensions.coverflow-alt-tab
       gnomeExtensions.freon
       gnomeExtensions.appindicator
-      gnomeExtensions.desktop-icons-ng-ding
+      gnomeExtensions.gtk4-desktop-icons-ng-ding
       gnomeExtensions.clipboard-history
       gnomeExtensions.hide-activities-button
       gnomeExtensions.weatherpanel
@@ -283,6 +299,9 @@
       gnomeExtensions.gamemode-shell-extension
       gnomeExtensions.daily-bing-wallpaper
       gnomeExtensions.ip-finder
+      gnomeExtensions.bluetooth-battery-meter
+      gnomeExtensions.hide-top-bar
+      gnomeExtensions.transparent-top-bar-adjustable-transparency
     ];
   };
 
@@ -314,6 +333,10 @@
     steam-run
     unzip
     roboto-slab
+    ghostty
+    tmux
+    gnome-console
+    gnome-extension-manager
     
   ];
 }
