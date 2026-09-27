@@ -89,7 +89,7 @@
   system.autoUpgrade = {
     enable = true;
     channel = "https://channels.nixos.org/nixos-unstable";
-    dates = "Wed *-*-* 19:00:00";
+    dates = "Fri *-*-* 15:00:00";
     randomizedDelaySec = "0";
     persistent = true;
     operation = "boot";
@@ -106,7 +106,7 @@
     script = ''
       set -euo pipefail
 
-      echo "Conservation des 5 dernières générations système..."
+      echo "Conservation des 3 dernières générations système..."
       nix-env \
         --profile /nix/var/nix/profiles/system \
         --delete-generations +3
@@ -120,19 +120,88 @@
     description = "Nettoyage quotidien des générations NixOS";
     wantedBy = [ "timers.target" ];
     timerConfig = {
-      OnCalendar = "Wed *-*-* 20:00:00";
+      OnCalendar = "Wed *-*-* 16:00:00";
       RandomizedDelaySec = "0";
       Persistent = true;
       Unit = "nixos-generations-cleanup.service";
     };
   };
 
-  ##########################################################################
-  # optimisation du store
-  #########################################################################
+    # ============================================================================
+  # NETTOYAGE ET OPTIMISATION DU STOCKAGE
+  # ============================================================================
 
   nix.settings.auto-optimise-store = true;
 
+  # Optimisation périodique du store Nix
+  nix.optimise = {
+    automatic = true;
+    dates = [ "Sun 04:00" ];
+  };
+
+  systemd.services.nixos-storage-cleanup = {
+    description = "Nettoyage du stockage NixOS, Flatpak et Podman";
+    path = with pkgs; [
+      bash
+      coreutils
+      findutils
+      gawk
+      gnugrep
+      nix
+      flatpak
+      podman
+    ];
+
+    serviceConfig = {
+      Type = "oneshot";
+    };
+
+    script = ''
+      set -euo pipefail
+
+      echo "=== Nettoyage des générations NixOS ==="
+
+      # Conserve les générations système âgées de plus de 14 jours.
+      # La génération actuellement utilisée reste conservée.
+      nix-collect-garbage --delete-older-than 14d
+
+      # Nettoyage des générations utilisateur éventuelles
+      nix-collect-garbage --delete-older-than 14d
+
+      echo "=== Collecte du store Nix ==="
+      nix-store --gc
+
+      echo "=== Optimisation du store Nix ==="
+      nix-store --optimise
+
+      echo "=== Nettoyage des runtimes Flatpak inutilisés ==="
+      flatpak uninstall --system --unused --assumeyes || true
+      flatpak uninstall --user --unused --assumeyes || true
+
+      #echo "=== Nettoyage des objets Podman inutilisés ==="
+      #podman system prune --all --force || true
+
+      echo "=== Nettoyage des caches temporaires utilisateur ==="
+      find /home -type f -path '*/.cache/*' -atime +30 -delete 2>/dev/null || true
+
+      echo "=== Nettoyage des fichiers temporaires anciens ==="
+      find /tmp -xdev -type f -mtime +7 -delete 2>/dev/null || true
+
+      echo "Nettoyage terminé."
+    '';
+  };
+
+  systemd.timers.nixos-storage-cleanup = {
+    description = "Nettoyage hebdomadaire du stockage";
+    wantedBy = [ "timers.target" ];
+
+    timerConfig = {
+      OnCalendar = "Sun 04:30";
+      Persistent = true;
+      RandomizedDelaySec = "30min";
+      Unit = "nixos-storage-cleanup.service";
+    };
+  };
   ##########################################################################
   # activation syncthing
   ##########################################################################  
@@ -237,6 +306,8 @@ services.journald.settings.Journal = {
       prismlauncher
       nmap
       libreoffice-stable
+      collabora-desktop
+      bitwarden-desktop
       thunderbird
       shortwave
       wireguard-tools
@@ -302,6 +373,8 @@ services.journald.settings.Journal = {
       gnomeExtensions.bluetooth-battery-meter
       gnomeExtensions.hide-top-bar
       gnomeExtensions.transparent-top-bar-adjustable-transparency
+      gnomeExtensions.compiz-alike-magic-lamp-effect
+    
     ];
   };
 
