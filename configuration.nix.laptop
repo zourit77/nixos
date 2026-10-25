@@ -13,7 +13,10 @@
   boot.loader.timeout = 1;
   boot.loader.systemd-boot.configurationLimit = 5;
 
-  boot.kernelParams = [ "quiet" "splash" ];
+  boot.kernelParams = [ 
+    "quiet" "splash"
+    "amd_pstate=active" 
+  ];
   boot.kernelPackages = pkgs.linuxPackages_latest;
   boot.kernel.sysctl = {
     "vm.max_map_count" = 1048576;
@@ -32,7 +35,7 @@
 
   hardware.nvidia = {
     modesetting.enable = true;
-    open = true;
+    open = false;
     nvidiaSettings = true;
     package = config.boot.kernelPackages.nvidiaPackages.stable;
 
@@ -106,13 +109,13 @@
     script = ''
       set -euo pipefail
 
-      echo "Conservation des 3 dernières générations système..."
+      echo "Conservation des 1 dernières générations système..."
       nix-env \
         --profile /nix/var/nix/profiles/system \
-        --delete-generations +3
+        --delete-generations +1
 
       echo "Nettoyage des données Nix âgées de plus de 7 jours..."
-      nix-collect-garbage --delete-older-than 3d
+      nix-collect-garbage --delete-older-than 1d
     '';
   };
 
@@ -120,7 +123,7 @@
     description = "Nettoyage quotidien des générations NixOS";
     wantedBy = [ "timers.target" ];
     timerConfig = {
-      OnCalendar = "Wed *-*-* 16:00:00";
+      OnCalendar = "Fri *-*-* 16:00:00";
       RandomizedDelaySec = "0";
       Persistent = true;
       Unit = "nixos-generations-cleanup.service";
@@ -163,10 +166,10 @@
 
       # Conserve les générations système âgées de plus de 14 jours.
       # La génération actuellement utilisée reste conservée.
-      nix-collect-garbage --delete-older-than 14d
+      nix-collect-garbage --delete-older-than 3d
 
       # Nettoyage des générations utilisateur éventuelles
-      nix-collect-garbage --delete-older-than 14d
+      nix-collect-garbage --delete-older-than 3d
 
       echo "=== Collecte du store Nix ==="
       nix-store --gc
@@ -273,7 +276,7 @@ services.journald.settings.Journal = {
 
   # ============================================================================
   # VIRTUALISATION
-  # ==================   ==========================================================
+  # ============================================================================
   virtualisation.libvirtd.enable = true;
   programs.virt-manager.enable = true;
  
@@ -284,6 +287,14 @@ services.journald.settings.Journal = {
     dockerCompat = true;
     defaultNetwork.settings.dns_enabled = true;
   }; 
+
+  # ============================================================================
+  # PRISE EN CHARGE NTFS
+  # ============================================================================
+  
+  boot.supportedFilesystems = [ "ntfs" ];
+  
+  
 
   # ============================================================================
   # UTILISATEUR & PACKAGES
@@ -299,6 +310,7 @@ services.journald.settings.Journal = {
       plymouth-matrix-theme
       mesa-demos
       brave
+      unrar
       parabolic
       photoflare
       steam
@@ -306,15 +318,16 @@ services.journald.settings.Journal = {
       prismlauncher
       nmap
       libreoffice-stable
-      collabora-desktop
+      #collabora-desktop
       bitwarden-desktop
       thunderbird
       shortwave
       wireguard-tools
       jellyfin
       vlc
+      joplin-desktop
       ffmpeg
-      audacity
+      #audacity
       ardour
       mixxx
       htop
@@ -332,7 +345,6 @@ services.journald.settings.Journal = {
       docker-compose
       vscodium
       rpi-imager
-      joplin-desktop
       transmission_4
       discord
       proton-vpn
@@ -372,6 +384,7 @@ services.journald.settings.Journal = {
       gnomeExtensions.ip-finder
       gnomeExtensions.bluetooth-battery-meter
       gnomeExtensions.hide-top-bar
+      gnomeExtensions.toggle-topbar
       gnomeExtensions.transparent-top-bar-adjustable-transparency
       gnomeExtensions.compiz-alike-magic-lamp-effect
     
@@ -387,6 +400,7 @@ services.journald.settings.Journal = {
     vim
     pciutils
     qemu
+    wine-wayland
     virt-manager
     virt-viewer
     gnome-tweaks
