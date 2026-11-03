@@ -56,6 +56,7 @@
 
   services.flatpak.enable = true;
 
+
   ##########################################################################
   # Démarrage, noyau et Plymouth
   ##########################################################################
@@ -66,6 +67,7 @@
 
   boot.kernelPackages = pkgs.linuxPackages_latest;
   boot.kernelParams = [
+    "amd_pstate=active"
     "quiet"
     "splash"
   ];
@@ -80,6 +82,19 @@
   };
 
   ##########################################################################
+  # Optimisation du processeur AMD Ryzen (5600 / 5600-series)
+  ##########################################################################
+
+  # Mises à jour du microcode AMD pour la stabilité et la sécurité du CPU
+  hardware.cpu.amd.updateMicrocode = true;
+
+
+
+  # Gestionnaire de profil de performance (recommandé pour basculer facilement entre performances et économie d'énergie)
+  services.power-profiles-daemon.enable = true;
+
+
+  ##########################################################################
   # Pilote graphique NVIDIA et accélération matérielle
   ##########################################################################
 
@@ -92,11 +107,10 @@
 
   hardware.nvidia = {
     modesetting.enable = true;
-    open = true;
+    open = false;
     nvidiaSettings = true;
     package = config.boot.kernelPackages.nvidiaPackages.stable;
-
-    # powerManagement.enable = true;
+    powerManagement.enable = true;
     # powerManagement.finegrained = true;
   };
 
@@ -187,17 +201,9 @@
     };
   };
 
-  services.avahi = {
-    enable = true;
-    nssmdns4 = true;
-    nssmdns6 = true;
-    openFirewall = true;
-
-    publish = {
-      enable = true;
-      userServices = true;
-    };
-  };
+  services.avahi.settings.publish."disable-publishing" = false;
+  services.avahi.settings.publish.disable-user-service-publishing = false;
+  services.avahi.settings.publish.publish-addresses = true;
 
   ##########################################################################
   # Utilisateur principal et groupes
@@ -221,6 +227,9 @@
       heroic
       gamemode
       protonplus
+      umu-launcher
+      faugus-launcher
+      prismlauncher
 
       # Navigateurs et communication
       brave
@@ -229,21 +238,24 @@
       telegram-desktop
       zoom-us
       anydesk
+      qbittorrent
 
       # Audio, vidéo et multimédia
       parabolic
+      spotify
       shortwave
       vlc
       ffmpeg
-      audacity
+      #audacity
       ardour
       mixxx
       jellyfin
       jellyfin-desktop
 
       # Bureautique, édition et développement
-      libreoffice-stable
-      photoflare
+      #libreoffice-stable
+      #collabora-desktop
+      #photoflare
       vscodium
       github-desktop
       joplin-desktop
@@ -259,6 +271,7 @@
       wakeonlan
       avahi
       gnome.gvfs
+      rustdesk
       flatpak
 
       # Outils système
@@ -283,7 +296,7 @@
       #kanagawa-gtk-theme
       whitesur-cursors
       whitesur-icon-theme
-      flat-remix-icon-theme
+      #flat-remix-icon-theme
       nixos-artwork.wallpapers.moonscape
       nixos-artwork.wallpapers.gear
       adi1090x-plymouth-themes
@@ -291,7 +304,7 @@
       plymouth-matrix-theme
       nixos-bgrt-plymouth
       gnome-tweaks
-
+      stress-ng
       # Extensions GNOME
       gnomeExtensions.dash-to-dock
       gnomeExtensions.blur-my-shell
@@ -311,6 +324,8 @@
       gnomeExtensions.transparent-windows
       gnomeExtensions.compiz-alike-magic-lamp-effect
       gnomeExtensions.focus
+      gnomeExtensions.bluetooth-battery-meter
+      gnomeExtensions.hide-topbar
     ];
   };
 
@@ -337,12 +352,18 @@
     });
   '';
 
-  # Exemple de montage automatique d'un volume de 2 To
-  # fileSystems."/mnt/games" = {
-  #   device = "/dev/disk/by-uuid/a0d3e781-12be-41ae-8869-9518bcf53820";
-  #   fsType = "ext4";
-  #   options = [ "defaults" "nofail" ];
-  # };
+  
+
+  # NVMe de jeux : montage automatique au démarrage
+  fileSystems."/mnt/games" = {
+    device = "/dev/disk/by-uuid/a0d3e781-12be-41ae-8869-9518bcf53820";
+    fsType = "ext4";
+    options = [
+      "defaults"
+      "nofail"
+      "x-systemd.device-timeout=10s"
+    ];
+  };
 
   ##########################################################################
   # Mises à jour automatiques
